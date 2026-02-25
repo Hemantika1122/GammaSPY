@@ -172,3 +172,4 @@ test = { features = ["test"], solve-group = "default" }
 
 [tool.pixi.dependencies]
 root = ">=6.38.0,<7"
+python = "3.12.*"
