@@ -17,11 +17,13 @@ tools integrate experimental data processing, nuclear database
 cross-referencing, and reaction simulation predictions into a unified automated
 workflow.
 
-The suite includes:
+The suite currently includes:
 
 - **2D background subtraction** — Native ROOT implementation of the
   Palameta–Waddington background subtraction algorithm for γ–γ matrices,
   eliminating the need to convert to legacy RadWare formats
+
+Planned features include:
 - **Coincident γ finder** — Automated coincidence identification tool with
   recursive cascade mapping against ENSDF and XUNDL databases, to arbitrary
   cascade order
@@ -35,23 +37,21 @@ The suite includes:
 
 ---
 
-## Requirements
+## Installation
 
-### Python
+GammaSPY requires ROOT with PyROOT bindings. If you already have a setup with that, you can install simply with:
+```bash
+pip install gammaspy
+```
 
-- Python ≥ 3.12
-- ROOT with PyROOT bindings (≥ 6.24 recommended)
-- NumPy, Matplotlib
+Other wise using `pixi`
+([installation instructions](https://pixi.prefix.dev/latest/installation/)) is
+highly recommended since it can also install `root`. Then simply:
 
-### C++ / ROOT
-
-- ROOT ≥ 6.24 (for TSpectrum)
-- GCC or Clang with C++17 support
-
-### TALYS (optional, for expected spectrum plotter)
-
-- TALYS ≥ 1.96 with the patches in `talys_patches/` applied
-- gfortran with 64-bit memory allocation support
+```bash
+git clone https://gitlab.com/Hemantika1122/GammaSPY.git
+pixi install
+```
 
 ### Databases
 
@@ -61,38 +61,27 @@ formatting instructions.
 
 ---
 
-## Installation
-
-Using `pixi`
-([installation instructions](https://pixi.prefix.dev/latest/installation/)) is
-highly recommended since it can also install `root`. Then simply:
-
-```bash
-git clone https://gitlab.com/Hemantika1122/GammaSPY.git
-pixi install
-```
-
----
-
 ## Quick Start
 
 ### Get projection with background subtraction
 
+If running in jupyter notebook use `%jsroot` for interactable TCanvases
+
 ```python
 from gammaspy.hist2d import Hist2D
 
-bkg = Hist2D("output_gg_addback.root", "hgg_sym")
-projection = bkg.get_projection(gate_energy=1454, gate_width=3)
+hgg = Hist2D("output_gg_addback.root", "hgg")
+canvas = hgg.draw_projection(gate_energy=1454, gate_width=3, subtract_backgrouns=True)
 ```
 
 ### Add coincidence finder
 
 ```python
-cf = CoincidenceFinder(
-    matrix_file="output_bkgsub.root",
+from gammaspy.nudat import LevelSchemes
+
+level_schemes = LevelSchemes(
     isotopes=["57Ni", "58Ni", "56Co", "57Co"],
     databases=["ENSDF", "XUNDL"],
 )
-cf.gate(energy=768.5, width=3.0, order=3)
-cf.plot(save="768_gate_projection.svg")
+canvas = hgg.draw_projection(gate_energy=1454, gate_width=3, level_schemes=level_schemes, coincidence_order=2)
 ```
