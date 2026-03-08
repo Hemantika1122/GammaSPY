@@ -22,12 +22,12 @@ The suite currently includes:
 - **2D background subtraction** — Native ROOT implementation of the
   Palameta–Waddington background subtraction algorithm for γ–γ matrices,
   eliminating the need to convert to legacy RadWare formats
-
-Planned features include:
-
 - **Coincident γ finder** — Automated coincidence identification tool with
   recursive cascade mapping against ENSDF and XUNDL databases, to arbitrary
   cascade order
+
+Planned features include:
+
 - **Expected spectrum plotter** — Quantitative prediction of gated γ-ray spectra
   based on TALYS cross-sections, detector efficiency, and experimental geometry
 - **DCO and polarization asymmetry extraction** — Angular correlation analysis
@@ -79,14 +79,17 @@ canvas = hgg.draw_projection(gate_energy=1454, gate_width=3, subtract_backgrouns
 
 ### Add coincidence finder
 
+First dowload the adaptedLevels csv files for relevant isotopes
+from the nudat website.
+
 ```python
 from gammaspy.nudat import LevelSchemes
 
 level_schemes = LevelSchemes(
     isotopes=["57Ni", "58Ni", "56Co", "57Co"],
-    databases=["ENSDF", "XUNDL"],
 )
 canvas = hgg.draw_projection(
-    gate_energy=1454, gate_width=3, level_schemes=level_schemes, coincidence_order=2
+    gate_energy=1454, gate_width=3,
+    level_schemes=level_schemes, coincidence_order=2
 )
 ```
