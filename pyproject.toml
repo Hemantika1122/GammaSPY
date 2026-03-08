@@ -87,6 +87,9 @@ module = "gammaspy.*"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
+[[tool.mypy.overrides]]
+module = "ROOT.*"
+ignore_missing_imports = true
 
 [tool.ruff]
 

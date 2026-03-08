@@ -72,7 +72,7 @@ class Hist2D:
         """
         return self.histogram
 
-    def symmetrize_histogram(self):
+    def symmetrize_histogram(self) -> None:
         """Symmetrize the underlying ROOT TH2D object if it is not symmetric already.
 
         This method sums the values in symmetric bins (i, j) and (j, i),
@@ -116,9 +116,7 @@ class Hist2D:
         is_symmetric = ROOT.CheckSymmetryTH2(self.histogram, n_bins_x, n_bins_y)
 
         if is_symmetric:
-            logger.info(
-                "Histogram %s is already symmetric", self.histogram.GetName()
-            )
+            logger.info("Histogram %s is already symmetric", self.histogram.GetName())
             return
 
         cpp_code_SymmetrizeTH2 = """
