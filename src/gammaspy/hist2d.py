@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING
 
 import ROOT  # pylint: disable=import-error
-from ROOT import TH2D  # pylint: disable=import-error
+from ROOT import TH1, TH2  # pylint: disable=import-error
 from typing_extensions import Self
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class Hist2D:
-    """A wrapper class for ROOT TH2D histograms with additional manipulation methods.
+    """A wrapper class for ROOT TH2 histograms with additional manipulation methods.
 
     This class provides a convenient interface for working with calibrated 2D
     histograms from ROOT files, with methods for common operations.
@@ -27,8 +28,9 @@ class Hist2D:
             "folder:histogram_name" (e.g., "Addback_gg_sym:All Clovers_sym").
 
     Attributes:
-        histogram: The underlying ROOT TH2D object.
+        histogram: The underlying ROOT TH2 object.
         file: The ROOT TFile object (kept open to maintain histogram access).
+        bin_width: The bin width of underlying TH2 object (expect same for both axis)
     """
 
     def __init__(self, file_path: str, histogram_path: str, symmetrize: bool = True):
@@ -66,26 +68,35 @@ class Hist2D:
             msg = f"Histogram not found: {hist_name} in {folder}"
             raise ValueError(msg)
 
+        bin_width_x = self.histogram.GetXaxis().GetBinWidth(1)
+        bin_width_y = self.histogram.GetYaxis().GetBinWidth(1)
+        if bin_width_x != bin_width_y:
+            msg = (
+                f"Histogram is has non-uniform bin widths: ({bin_width_x} in x-axis and {bin_width_y} in y-axis)"
+            )
+            raise ValueError(msg)
+        self.bin_width = bin_width_y
+        
         if symmetrize:
             self.symmetrize_histogram()
 
-    def get_histogram(self) -> TH2D:
-        """Get the underlying ROOT TH2D object.
+    def get_histogram(self) -> TH2:
+        """Get the underlying ROOT TH2 object.
 
         Returns:
-            The ROOT TH2D histogram object.
+            The ROOT TH2 histogram object.
         """
         return self.histogram
 
     def symmetrize_histogram(self) -> None:
-        """Symmetrize the underlying ROOT TH2D object if it is not symmetric already.
+        """Symmetrize the underlying ROOT TH2 object if it is not symmetric already.
 
         This method sums the values in symmetric bins (i, j) and (j, i),
         storing the result in both bins. The histogram must be square
         (same number of bins in X and Y).
 
         Returns:
-            The ROOT TH2D histogram object.
+            The ROOT TH2 histogram object.
         """
         n_bins_x = self.histogram.GetNbinsX()
         n_bins_y = self.histogram.GetNbinsY()
@@ -146,6 +157,32 @@ class Hist2D:
 
         return
 
+    def get_projection(self, gate_energy: float, gate_width: float, unit:str = "keV") -> TH1:
+        """Applies a gate of gate_energy ± gate_width/2 and returns the projected spectrum.
+            
+        Parameters:
+            gate_energy: Gate energy
+            gate_width: Gate width
+            unit: Energy units (default: keV)
+        Returns:
+            The projected ROOT TH1 histogram object.
+        """
+
+        logger.info("Using fixed gate energy %f instead of looking in the database", gate_energy)
+            
+        gate = (round(gate_energy)-gate_width/2,round(gate_energy)+gate_width/2)
+        gate_bin = [math.floor(gate[0]/self.bin_width), math.ceil(gate[1]/self.bin_width)]
+        gate_bin[0] = max(gate_bin[0], 1)
+        gate_bin[1] = min(gate_bin[1], self.histogram.GetNbinsY())
+    
+        pro_X = self.histogram.ProjectionX(name = f"Gated in [{gate_bin[0]*self.bin_width} - {gate_bin[1]*self.bin_width}] {unit}",
+                                           firstybin=gate_bin[0],
+                                           lastybin=gate_bin[1])
+
+        return pro_X.Clone()
+
+        
+        
     def close(self) -> None:
         """Close the ROOT file and release resources."""
         if self.file and self.file.IsOpen():
