@@ -146,7 +146,7 @@ class Hist2D:
         if self.file and self.file.IsOpen():
             self.file.Close()
 
-    def __enter__(self) -> "Hist2D":
+    def __enter__(self) -> Hist2D:
         """Context manager entry."""
         return self
 
