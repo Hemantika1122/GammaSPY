@@ -146,14 +146,19 @@ class Hist2D:
         if self.file and self.file.IsOpen():
             self.file.Close()
 
-    def __enter__(self):
+    def __enter__(self) -> "Hist2D":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
         """Context manager exit - ensures file is closed."""
         self.close()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor - ensures file is closed on object destruction."""
         self.close()
