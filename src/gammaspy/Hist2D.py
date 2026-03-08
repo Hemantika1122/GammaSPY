@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from ROOT import TH2D, TFile
+import ROOT
+from ROOT import TH2D
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class Hist2D:
         Raises:
             ValueError: If the histogram is not square.
         """
-        self.file = TFile(file_path, "read")
+        self.file = ROOT.TFile(file_path, "read")
 
         if not self.file.IsOpen():
             msg = f"Unable to open file: {file_path}"
@@ -90,16 +91,29 @@ class Hist2D:
             )
             raise ValueError(msg)
 
-        is_symmetric = True
-        for i in range(1, n_bins_x + 1):
-            for j in range(i + 1, n_bins_y + 1):
-                if self.histogram.GetBinContent(
-                    i, j
-                ) != self.histogram.GetBinContent(j, i):
-                    is_symmetric = False
-                    break
-            if not is_symmetric:
-                break
+        # Write core logic in C++ code in a string
+        cpp_code_CheckSymmetryTH2 = """
+        bool CheckSymmetryTH2(TH2* h, const int nx, const int ny)
+        {
+            bool is_symmetric = true;
+
+            for (int ix = 1; ix <= nx; ++ix) {
+                for (int iy = ix + 1; iy <= ny; ++iy) {
+                    if (h->GetBinContent(ix, iy) != h->GetBinContent(iy, ix)){
+                        is_symmetric=false;
+                        break;
+                    }
+                }
+                if (!is_symmetric){
+                    break;
+                }
+            }
+            return is_symmetric;
+        }
+        """
+        # Inject the code in the ROOT interpreter
+        ROOT.gInterpreter.ProcessLine(cpp_code_CheckSymmetryTH2)
+        is_symmetric = ROOT.CheckSymmetryTH2(self.histogram, n_bins_x, n_bins_y)
 
         if is_symmetric:
             logger.info(
@@ -107,14 +121,25 @@ class Hist2D:
             )
             return
 
-        for i in range(1, n_bins_x + 1):
-            for j in range(i + 1, n_bins_y + 1):
-                content_ij = self.histogram.GetBinContent(i, j)
-                content_ji = self.histogram.GetBinContent(j, i)
-                sym_content = content_ij + content_ji
+        cpp_code_SymmetrizeTH2 = """
+        void SymmetrizeTH2(TH2* h, const int nx, const int ny)
+        {
+            for (int i = 1; i <= nx; ++i) {
+                for (int j = i + 1; j <= ny; ++j) {
+                    auto content_ij = h->GetBinContent(i, j);
+                    auto content_ji = h->GetBinContent(j, i);
+                    auto sym_content = content_ij + content_ji;
 
-                self.histogram.SetBinContent(i, j, sym_content)
-                self.histogram.SetBinContent(j, i, sym_content)
+                    h->SetBinContent(i, j, sym_content);
+                    h->SetBinContent(j, i, sym_content);
+                }
+            }
+            return;
+        }
+        """
+        # Inject the code in the ROOT interpreter
+        ROOT.gInterpreter.ProcessLine(cpp_code_SymmetrizeTH2)
+        ROOT.SymmetrizeTH2(self.histogram, n_bins_x, n_bins_y)
 
         return
 
