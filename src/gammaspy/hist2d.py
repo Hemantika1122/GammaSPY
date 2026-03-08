@@ -1,4 +1,9 @@
-"""Module for 2D histogram operations."""
+"""Module for 2D histogram operations.
+
+This module provides a wrapper class for ROOT TH2 histograms with additional
+manipulation methods, including symmetrization, projection, and visualization
+functionalities for calibrated 2D histograms from ROOT files.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,7 @@ import math
 from typing import TYPE_CHECKING
 
 import ROOT  # pylint: disable=import-error
-from ROOT import TH1, TH2  # pylint: disable=import-error
+from ROOT import TH1, TH2, TCanvas  # pylint: disable=import-error
 from typing_extensions import Self
 
 if TYPE_CHECKING:
@@ -22,6 +27,10 @@ class Hist2D:
     This class provides a convenient interface for working with calibrated 2D
     histograms from ROOT files, with methods for common operations.
 
+    Note:
+        The histogram_path must be in the format "folder:histogram_name"
+        (e.g., "Addback_gg:All Clovers").
+
     Parameters:
         file_path: Path to the ROOT file.
         histogram_path: Path to the histogram in the ROOT file, in the format
@@ -31,6 +40,12 @@ class Hist2D:
         histogram: The underlying ROOT TH2 object.
         file: The ROOT TFile object (kept open to maintain histogram access).
         bin_width: The bin width of underlying TH2 object (expect same for both axis)
+
+    Raises:
+        OSError: If the ROOT file cannot be opened.
+        ValueError: If the folder, histogram is not found, or if bin widths
+            are not uniform between X and Y axes.
+        ValueError: If symmetrize is True and the histogram is not square.
     """
 
     def __init__(self, file_path: str, histogram_path: str, symmetrize: bool = True):
@@ -71,20 +86,21 @@ class Hist2D:
         bin_width_x = self.histogram.GetXaxis().GetBinWidth(1)
         bin_width_y = self.histogram.GetYaxis().GetBinWidth(1)
         if bin_width_x != bin_width_y:
-            msg = (
-                f"Histogram is has non-uniform bin widths: ({bin_width_x} in x-axis and {bin_width_y} in y-axis)"
-            )
+            msg = f"Histogram is has non-uniform bin widths: ({bin_width_x} in x-axis and {bin_width_y} in y-axis)"
             raise ValueError(msg)
         self.bin_width = bin_width_y
-        
+
         if symmetrize:
             self.symmetrize_histogram()
 
     def get_histogram(self) -> TH2:
         """Get the underlying ROOT TH2 object.
 
+        This returns a clone of the histogram, so modifications to the
+        returned object will not affect the internal histogram.
+
         Returns:
-            The ROOT TH2 histogram object.
+            The ROOT TH2 histogram object (a clone).
         """
         return self.histogram
 
@@ -95,8 +111,11 @@ class Hist2D:
         storing the result in both bins. The histogram must be square
         (same number of bins in X and Y).
 
+        Raises:
+            ValueError: If the histogram is not square.
+
         Returns:
-            The ROOT TH2 histogram object.
+            None
         """
         n_bins_x = self.histogram.GetNbinsX()
         n_bins_y = self.histogram.GetNbinsY()
@@ -157,32 +176,97 @@ class Hist2D:
 
         return
 
-    def get_projection(self, gate_energy: float, gate_width: float, unit:str = "keV") -> TH1:
-        """Applies a gate of gate_energy ± gate_width/2 and returns the projected spectrum.
-            
+    def get_projection(
+        self, gate_energy: float, gate_width: float, unit: str = "keV"
+    ) -> TH1:
+        """Apply a gate and return the projected 1D spectrum.
+
+        Applies a gate around gate_energy ± gate_width/2 and projects
+        the 2D histogram onto the X-axis to produce a 1D spectrum.
+
         Parameters:
-            gate_energy: Gate energy
-            gate_width: Gate width
-            unit: Energy units (default: keV)
+            gate_energy: Center energy for the gate.
+            gate_width: Total width of the gate.
+            unit: Energy units (default: keV).
+
         Returns:
             The projected ROOT TH1 histogram object.
         """
 
-        logger.info("Using fixed gate energy %f instead of looking in the database", gate_energy)
-            
-        gate = (round(gate_energy)-gate_width/2,round(gate_energy)+gate_width/2)
-        gate_bin = [math.floor(gate[0]/self.bin_width), math.ceil(gate[1]/self.bin_width)]
+        logger.info(
+            "Using fixed gate energy %f instead of looking in the database", gate_energy
+        )
+
+        gate = (
+            round(gate_energy) - gate_width / 2,
+            round(gate_energy) + gate_width / 2,
+        )
+        gate_bin = [
+            math.floor(gate[0] / self.bin_width),
+            math.ceil(gate[1] / self.bin_width),
+        ]
         gate_bin[0] = max(gate_bin[0], 1)
         gate_bin[1] = min(gate_bin[1], self.histogram.GetNbinsY())
-    
-        pro_X = self.histogram.ProjectionX(name = f"Gated in [{gate_bin[0]*self.bin_width} - {gate_bin[1]*self.bin_width}] {unit}",
-                                           firstybin=gate_bin[0],
-                                           lastybin=gate_bin[1])
 
-        return pro_X.Clone()
+        pro = self.histogram.ProjectionX(
+            name=f"Gated in [{gate_bin[0] * self.bin_width} - {gate_bin[1] * self.bin_width}] {unit}",
+            firstybin=gate_bin[0],
+            lastybin=gate_bin[1],
+        )
 
-        
-        
+        return pro.Clone()
+
+    def draw_projection(
+        self,
+        gate_energy: float,
+        gate_width: float,
+        unit: str = "keV",
+        show_title: bool = False,
+        show_stats: bool = True,
+    ) -> TCanvas:
+        """Apply a gate, project the spectrum, and draw it on a canvas.
+
+        Applies a gate around gate_energy ± gate_width/2, projects the 2D
+        histogram onto the X-axis, and draws the result on a ROOT TCanvas.
+
+        Parameters:
+            gate_energy: Center energy for the gate.
+            gate_width: Total width of the gate.
+            unit: Energy units (default: keV).
+            show_title: Whether to show the histogram title (default: False).
+            show_stats: Whether to show statistics box (default: True).
+
+        Returns:
+            The ROOT TCanvas with the projected histogram.
+        """
+
+        projected_histogram = self.get_projection(
+            gate_energy=gate_energy, gate_width=gate_width, unit=unit
+        )
+
+        canvas = TCanvas("Gated", "Gated", 1450, 1000)
+        projected_histogram.GetYaxis().SetTitle(f"Counts/{self.bin_width} {unit}")
+        projected_histogram.GetYaxis().SetTitleFont(
+            42
+        )  # 42 is the code for Times New Roman font
+        projected_histogram.GetYaxis().SetTitleSize(0.04)
+        projected_histogram.GetXaxis().SetTitle("E_{#gamma}")
+        projected_histogram.GetXaxis().SetTitleFont(
+            42
+        )  # 42 is the code for Times New Roman font
+        projected_histogram.GetXaxis().SetTitleSize(0.04)
+
+        if not show_stats:
+            projected_histogram.SetStats(0)
+        if not show_title:
+            projected_histogram.SetTitle("")
+
+        projected_histogram.Draw("HISTSAME")
+
+        canvas.Draw()
+
+        return canvas
+
     def close(self) -> None:
         """Close the ROOT file and release resources."""
         if self.file and self.file.IsOpen():
