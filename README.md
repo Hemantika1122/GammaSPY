@@ -47,7 +47,7 @@ that, you can install simply with:
 pip install gammaspy
 ```
 
-Other wise using `pixi`
+Otherwise using `pixi`
 ([installation instructions](https://pixi.prefix.dev/latest/installation/)) is
 highly recommended since it can also install `root`. Then simply:
 
@@ -55,12 +55,6 @@ highly recommended since it can also install `root`. Then simply:
 git clone https://gitlab.com/Hemantika1122/GammaSPY.git
 pixi install
 ```
-
-### Databases
-
-The tools query ENSDF and XUNDL locally. Database files should be placed in
-`data/ensdf/` and `data/xundl/` respectively. See `data/README.md` for
-formatting instructions.
 
 ---
 
@@ -74,13 +68,13 @@ If running in jupyter notebook use `%jsroot` for interactable TCanvases
 from gammaspy.hist2d import Hist2D
 
 hgg = Hist2D("output_gg_addback.root", "hgg")
-canvas = hgg.draw_projection(gate_energy=1454, gate_width=3, subtract_backgrouns=True)
+canvas = hgg.draw_projection(gate_energy=1454, gate_width=3, subtract_background=True)
 ```
 
 ### Add coincidence finder
 
-First dowload the adaptedLevels csv files for relevant isotopes
-from the nudat website.
+First download the adaptedLevels csv files for relevant isotopes from the nudat
+website.
 
 ```python
 from gammaspy.nudat import LevelSchemes
@@ -89,7 +83,6 @@ level_schemes = LevelSchemes(
     isotopes=["57Ni", "58Ni", "56Co", "57Co"],
 )
 canvas = hgg.draw_projection(
-    gate_energy=1454, gate_width=3,
-    level_schemes=level_schemes, coincidence_order=2
+    gate_energy=1454, gate_width=3, level_schemes=level_schemes, coincidence_order=2
 )
 ```
