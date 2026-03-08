@@ -24,6 +24,7 @@ The suite currently includes:
   eliminating the need to convert to legacy RadWare formats
 
 Planned features include:
+
 - **Coincident γ finder** — Automated coincidence identification tool with
   recursive cascade mapping against ENSDF and XUNDL databases, to arbitrary
   cascade order
@@ -39,7 +40,9 @@ Planned features include:
 
 ## Installation
 
-GammaSPY requires ROOT with PyROOT bindings. If you already have a setup with that, you can install simply with:
+GammaSPY requires ROOT with PyROOT bindings. If you already have a setup with
+that, you can install simply with:
+
 ```bash
 pip install gammaspy
 ```
@@ -83,5 +86,7 @@ level_schemes = LevelSchemes(
     isotopes=["57Ni", "58Ni", "56Co", "57Co"],
     databases=["ENSDF", "XUNDL"],
 )
-canvas = hgg.draw_projection(gate_energy=1454, gate_width=3, level_schemes=level_schemes, coincidence_order=2)
+canvas = hgg.draw_projection(
+    gate_energy=1454, gate_width=3, level_schemes=level_schemes, coincidence_order=2
+)
 ```
