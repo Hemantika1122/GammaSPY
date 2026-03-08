@@ -1,6 +1,7 @@
 # GammaSPY: Gamma Spectroscopy analysis in PYthon
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+> **Warning**
+This package is in active development and may introduce breaking changes.
 
 A suite of open-source tools for automated γ-ray spectroscopy analysis of fast
 neutron-induced nuclear reactions, developed for data collected with the EXOGAM
@@ -38,7 +39,7 @@ The suite includes:
 
 ### Python
 
-- Python ≥ 3.8
+- Python ≥ 3.12
 - ROOT with PyROOT bindings (≥ 6.24 recommended)
 - NumPy, Matplotlib
 
@@ -62,31 +63,30 @@ formatting instructions.
 
 ## Installation
 
+Using `pixi` ([installation instructions](https://pixi.prefix.dev/latest/installation/)) is highly recommended since it can also install `root`.
+Then simply:
+
 ```bash
-git clone https://gitlab.com/[your-username]/exogam-analysis.git
-cd exogam-analysis
-pip install -r requirements.txt
+git clone https://gitlab.com/Hemantika1122/GammaSPY.git
+pixi install
 ```
 
 ---
 
 ## Quick Start
 
-### Run background subtraction
+### Get projection with background subtraction
 
 ```python
-from bkg_subtraction import RadwareBkg2D
+from gammaspy.hist2d import Hist2D
 
-bkg = RadwareBkg2D("output_gg_addback.root", "hgg_sym")
-bkg.compute()
-bkg.save("output_bkgsub.root")
+bkg = Hist2D("output_gg_addback.root", "hgg_sym")
+projection = bkg.get_projection(gate_energy=1454, gate_width=3)
 ```
 
-### Launch the coincidence finder
+### Add coincidence finder
 
 ```python
-from coincidence_finder import CoincidenceFinder
-
 cf = CoincidenceFinder(
     matrix_file="output_bkgsub.root",
     isotopes=["57Ni", "58Ni", "56Co", "57Co"],
@@ -95,62 +95,3 @@ cf = CoincidenceFinder(
 cf.gate(energy=768.5, width=3.0, order=3)
 cf.plot(save="768_gate_projection.svg")
 ```
-
----
-
-## Repository Structure
-
-```
-exogam-analysis/
-├── proof/               # PROOF-based parallel processing code (C++)
-├── bkg_subtraction/     # 2D Radware-style background subtraction (Python/ROOT)
-├── coincidence_finder/  # Automated coincidence identification (Python)
-├── expected_spectrum/   # Expected yield calculator and spectrum plotter (Python)
-├── angular_correlation/ # DCO ratio and polarization asymmetry tools (Python)
-├── talys_patches/       # TALYS source code modifications and apply script
-├── data/                # Database files (ENSDF, XUNDL) — not included, see data/README.md
-├── examples/            # Example scripts and notebooks
-└── tests/               # Unit tests
-```
-
----
-
-## Citation
-
-If you use this software, please cite the associated thesis and this repository:
-
-```
-[Author], "[Thesis title]", PhD Thesis, [University], [Year].
-Repository: https://gitlab.com/[your-username]/exogam-analysis
-```
-
-BibTeX entry:
-
-```bibtex
-@phdthesis{[citekey],
-  author  = {[Author]},
-  title   = {[Thesis title]},
-  school  = {[University]},
-  year    = {[Year]},
-  note    = {Software: \url{https://gitlab.com/[your-username]/exogam-analysis}}
-}
-```
-
----
-
-## License
-
-Copyright © [Year] [Author]
-
-Licensed under the **Apache License, Version 2.0**. You may use, distribute, and
-modify this software freely provided that you retain the original copyright
-notice and attribution. See [LICENSE](LICENSE) for the full terms.
-
----
-
-## Acknowledgements
-
-- GANIL facility and the EXOGAM collaboration
-- ENSDF and XUNDL databases (National Nuclear Data Center, BNL)
-- TALYS nuclear reaction code (NRG Petten)
-- ROOT data analysis framework (CERN)
