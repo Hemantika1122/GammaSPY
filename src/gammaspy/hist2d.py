@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import ROOT
-from ROOT import TH2D
+import ROOT  # pylint: disable=import-error
+from ROOT import TH2D  # pylint: disable=import-error
 from typing_extensions import Self
 
 if TYPE_CHECKING:
@@ -97,7 +97,7 @@ class Hist2D:
             raise ValueError(msg)
 
         # Write core logic in C++ code in a string
-        cpp_code_CheckSymmetryTH2 = """
+        cpp_code_check_symmetry = """
         bool CheckSymmetryTH2(TH2* h, const int nx, const int ny)
         {
             bool is_symmetric = true;
@@ -117,14 +117,14 @@ class Hist2D:
         }
         """
         # Inject the code in the ROOT interpreter
-        ROOT.gInterpreter.ProcessLine(cpp_code_CheckSymmetryTH2)
+        ROOT.gInterpreter.ProcessLine(cpp_code_check_symmetry)
         is_symmetric = ROOT.CheckSymmetryTH2(self.histogram, n_bins_x, n_bins_y)
 
         if is_symmetric:
             logger.info("Histogram %s is already symmetric", self.histogram.GetName())
             return
 
-        cpp_code_SymmetrizeTH2 = """
+        cpp_code_symmetrize = """
         void SymmetrizeTH2(TH2* h, const int nx, const int ny)
         {
             for (int i = 1; i <= nx; ++i) {
@@ -141,7 +141,7 @@ class Hist2D:
         }
         """
         # Inject the code in the ROOT interpreter
-        ROOT.gInterpreter.ProcessLine(cpp_code_SymmetrizeTH2)
+        ROOT.gInterpreter.ProcessLine(cpp_code_symmetrize)
         ROOT.SymmetrizeTH2(self.histogram, n_bins_x, n_bins_y)
 
         return
