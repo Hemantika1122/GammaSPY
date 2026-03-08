@@ -12,11 +12,13 @@ import math
 from typing import TYPE_CHECKING
 
 import ROOT  # pylint: disable=import-error
-from ROOT import TH1, TH2, TCanvas  # pylint: disable=import-error
+from ROOT import TH1, TH2, TCanvas, TLatex, TLine  # pylint: disable=import-error
 from typing_extensions import Self
 
 if TYPE_CHECKING:
     from types import TracebackType
+
+    from gammaspy.nudat import LevelSchemes
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +291,11 @@ class Hist2D:
         show_stats: bool = True,
         subtract_background: bool = True,
         sideband_background_gate_energies: list[float] | None = None,
-    ) -> TCanvas:
+        level_schemes: LevelSchemes | None = None,
+        coincidence_order: int = 1,
+        fontsize: float = 0.015,
+        starting_level: float | None = None,
+    ) -> tuple[TCanvas, list[TLine], list[TLatex]]:
         """Apply a gate, project the spectrum, and draw it on a canvas.
 
         Applies a gate around gate_energy ± gate_width/2, projects the 2D
@@ -303,6 +309,10 @@ class Hist2D:
             show_stats: Whether to show statistics box (default: True).
             subtract_background: Whether to subtract background (default: True).
             sideband_background_gate_energies: List of gate energies to be used for background subtraction. If none provided, 2d background subtraction method is used by default.
+            level_schemes: LevelSchemes object containing nuclear level scheme data for drawing coincidence lines.
+            coincidence_order: Maximum order of coincidences to search for (default: 1).
+            fontsize: fontsize for the identifiers (default: 0.015)
+            starting_level: Starting level energy in keV to filter coincidences (optional).
 
         Returns:
             The ROOT TCanvas with the projected histogram.
@@ -330,6 +340,8 @@ class Hist2D:
                     projected_histogram.Add(pro_sb[i], -1)
 
         canvas = TCanvas("Gated", "Gated", 1450, 1000)
+        canvas.SetTopMargin(0.30)  # Give extra space on top
+
         projected_histogram.GetYaxis().SetTitle(f"Counts/{self.bin_width} {unit}")
         projected_histogram.GetYaxis().SetTitleFont(
             42
@@ -348,9 +360,83 @@ class Hist2D:
 
         projected_histogram.Draw("HISTSAME")
 
+        lines: list[TLine] = []
+        texts: list[TLatex] = []
+        if level_schemes:
+            lines, texts = self.draw_coincidences(
+                gate_energy=gate_energy,
+                gate_width=gate_width,
+                level_schemes=level_schemes,
+                fontsize=fontsize,
+                max_order=coincidence_order,
+                starting_level=starting_level,
+            )
+
         canvas.Draw()
 
-        return canvas
+        return canvas, lines, texts
+
+    def draw_coincidences(
+        self,
+        gate_energy: float,
+        gate_width: float,
+        level_schemes: LevelSchemes,
+        fontsize: float,
+        max_order: int = 2,
+        starting_level: float | None = None,
+    ) -> tuple[list[TLine], list[TLatex]]:
+        """Draw coincidence lines and labels on the histogram.
+
+        Retrieves coincidence paths from the level scheme and draws
+        vertical lines at coincident gamma energies with labels.
+
+        Parameters:
+            gate_energy: Center energy for the gate in keV.
+            gate_width: Total width of the gate in keV.
+            level_schemes: LevelSchemes object containing nuclear data.
+            fontsize: Font size for the labels.
+            max_order: Maximum coincidence order to search (default: 2).
+
+        Returns:
+            A tuple containing:
+                - list: List of ROOT TLine objects for the coincidence lines.
+                - list: List of ROOT TLatex objects for the labels.
+        """
+        lines = []
+        texts = []
+        max_hist_y = self.histogram.GetMaximum()
+        # title_height = 0.97
+
+        # 1. Collect all data once
+        all_paths = level_schemes.get_coincidence_paths(
+            gate_energy=gate_energy,
+            gate_width=gate_width,
+            max_order=max_order,
+            starting_level=starting_level,
+        )
+
+        # 2. Loop through results and create ROOT objects
+        for item in all_paths:
+            color = ROOT.kRed if item["direction"] == "up" else ROOT.kGreen
+
+            # Adjust line style based on order (Solid for 1st, Dashed for 2nd, etc.)
+            line = ROOT.TLine(item["energy"], 0, item["energy"], max_hist_y)
+            line.SetLineColor(color + 2)
+            line.SetLineWidth(2)
+            line.SetLineStyle(1 if item["order"] == 1 else 1 + item["order"])
+            line.Draw("same")
+            lines.append(line)
+
+            # Label formatting
+            display_text = f"{item['isotope']} [{item['order']}o]: {item['chain']} -> {item['label']}"
+            tt = ROOT.TLatex(item["energy"], max_hist_y, display_text)
+            tt.SetTextAlign(31)
+            tt.SetTextSize(fontsize)
+            tt.SetTextAngle(90)
+            tt.Draw()
+            texts.append(tt)
+
+        return lines, texts
 
     def close(self) -> None:
         """Close the ROOT file and release resources."""
