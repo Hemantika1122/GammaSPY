@@ -26,7 +26,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = ["matplotlib>=3.10.8", "typing-extensions", "pandas>=3.0.1,<4"]
+dependencies = ["matplotlib>=3.10.8", "typing-extensions", "pandas>=2.1,<4"]
 
 [project.urls]
 Homepage = "https://github.com/Hemantika1122/gammaspy"
