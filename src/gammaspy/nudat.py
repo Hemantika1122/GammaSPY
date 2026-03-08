@@ -52,15 +52,15 @@ class LevelSchemes:
         if path is None:
             path = Path.cwd()
 
-        self.df: dict[str, pd.DataFrame] = {}
+        self.dfs: dict[str, pd.DataFrame] = {}
         self.gamma_energies: dict[str, list[float | None]] = {}
 
         for isotope in isotopes:
-            self.df[isotope] = self._read_database(
+            self.dfs[isotope] = self._read_database(
                 filename=path / f"adoptedLevels{isotope}.csv",
                 head=None,
             )
-            gammas = self.df[isotope]["E(γ)(keV)"]  # noqa: RUF001
+            gammas = self.dfs[isotope]["E(γ)(keV)"]  # noqa: RUF001
             self.gamma_energies[isotope] = [
                 item for val in gammas if val is not None for item in val
             ]
@@ -124,7 +124,95 @@ class LevelSchemes:
         KeyError
             If the isotope is not in the loaded data.
         """
-        return self.df[isotope]
+        return self.dfs[isotope]
+
+    def get_coincidences(
+        self,
+        gate_energy: float,
+        gate_width: float,
+        return_levels: bool = False,
+        require_starting_level: float | None = None,
+    ) -> dict[str, list[Any]]:
+
+        result = {}
+
+        for isotope, df in self.dfs.items():
+            result[isotope] = {}
+            for df_index, gamma_series in enumerate(df["E(γ)(keV)"]):
+                if gamma_series is not None:  # Checking for non-null values
+                    for gamma_index, gamma_value in enumerate(gamma_series):
+                        if abs(gamma_value - gate_energy) <= gate_width / 2:
+                            gate_starting_level = df["E(level)(keV)"][df_index]
+                            gate_ending_level = df["Final Levels"][df_index][
+                                gamma_index
+                            ]  # Ending level energy of the gate gamma
+
+                            if (
+                                require_starting_level
+                                and gate_starting_level != require_starting_level
+                            ):
+                                continue
+
+                            result[isotope][gamma_value] = []
+
+                            for coin_df_index, coin_starting_level in enumerate(
+                                df["E(level)(keV)"]
+                            ):
+                                if (coin_starting_level == gate_ending_level) and (
+                                    df["E(γ)(keV)"][coin_df_index] is not None
+                                ):
+                                    for i, coin_gamma_energy in enumerate(
+                                        df["E(γ)(keV)"][coin_df_index]
+                                    ):
+                                        tt = f"{isotope}: {coin_gamma_energy}"
+                                        try:
+                                            tt += f", {df['Jπ(level)'][coin_df_index].replace('+', '^{+}')} -> {df['Final Jπ'][coin_df_index][i].replace('+', '^{+}')} ({df['I(γ)'][coin_df_index][i].replace('≤', '#leq')}, {df['M(γ)'][coin_df_index][i]})"
+                                        except:
+                                            tt += f", ({df['I(γ)'][coin_df_index][i].replace('≤', '#leq')})"
+
+                                        if return_levels:
+                                            result[isotope][gamma_value].append(
+                                                [coin_gamma_energy, "down", tt, coin_starting_level]
+                                            )
+                                        else:
+                                            result[isotope][gamma_value].append(
+                                                [coin_gamma_energy, "down", tt]
+                                            )
+
+                            for coin_df_index, coin_ending_level_series in enumerate(
+                                df["Final Levels"]
+                            ):
+                                if coin_ending_level_series is not None:
+                                    for i, j in enumerate(coin_ending_level_series):
+                                        if j == gate_starting_level:
+                                            coin_gamma_energy = df["E(γ)(keV)"][
+                                                coin_df_index
+                                            ][i]
+                                            g_up_startinglevel = df["E(level)(keV)"][
+                                                coin_df_index
+                                            ]
+
+                                            tt = f"{isotope}: {coin_gamma_energy}"
+                                            try:
+                                                tt += f", {df['Jπ(level)'][coin_df_index].replace('+', '^{+}')} -> {df['Final Jπ'][coin_df_index][i].replace('+', '^{+}')} ({df['I(γ)'][coin_df_index][i].replace('≤', '#leq')}, {df['M(γ)'][coin_df_index][i]})"
+                                            except:
+                                                tt += f", -> {df['Final Jπ'][coin_df_index][i].replace('+', '^{+}')} ({df['I(γ)'][coin_df_index][i].replace('≤', '#leq')})"
+
+                                            if return_levels:
+                                                result[isotope][gamma_value].append(
+                                                    [
+                                                        coin_gamma_energy,
+                                                        "up",
+                                                        tt,
+                                                        g_up_startinglevel,
+                                                    ]
+                                                )
+                                            else:
+                                                result[isotope][gamma_value].append(
+                                                    [coin_gamma_energy, "up", tt]
+                                                )
+
+        return result
 
 
 def nudata_energy_cleanup(row: Any) -> list[float | None]:
