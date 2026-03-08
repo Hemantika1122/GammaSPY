@@ -176,8 +176,37 @@ class Hist2D:
 
         return
 
+    def get_gate_bins(self, gate_energy: float, gate_width: float) -> list[int]:
+        """Calculate the bin range for a gate around the given energy.
+
+        Converts the gate energy and width to bin indices, ensuring bounds
+        are within the histogram range.
+
+        Parameters:
+            gate_energy: Center energy for the gate.
+            gate_width: Total width of the gate.
+
+        Returns:
+            A list containing [first_bin, last_bin] for the gate range.
+        """
+        gate = (
+            round(gate_energy) - gate_width / 2,
+            round(gate_energy) + gate_width / 2,
+        )
+        gate_bins = [
+            math.floor(gate[0] / self.bin_width),
+            math.ceil(gate[1] / self.bin_width),
+        ]
+        gate_bins[0] = max(gate_bins[0], 1)
+        gate_bins[1] = min(gate_bins[1], self.histogram.GetNbinsY())
+
+        return gate_bins
+
     def get_projection(
-        self, gate_energy: float, gate_width: float, unit: str = "keV"
+        self,
+        gate_energy: float,
+        gate_width: float,
+        unit: str = "keV",
     ) -> TH1:
         """Apply a gate and return the projected 1D spectrum.
 
@@ -197,24 +226,59 @@ class Hist2D:
             "Using fixed gate energy %f instead of looking in the database", gate_energy
         )
 
-        gate = (
-            round(gate_energy) - gate_width / 2,
-            round(gate_energy) + gate_width / 2,
-        )
-        gate_bin = [
-            math.floor(gate[0] / self.bin_width),
-            math.ceil(gate[1] / self.bin_width),
-        ]
-        gate_bin[0] = max(gate_bin[0], 1)
-        gate_bin[1] = min(gate_bin[1], self.histogram.GetNbinsY())
+        gate_bins = self.get_gate_bins(gate_energy=gate_energy, gate_width=gate_width)
 
         pro = self.histogram.ProjectionX(
-            name=f"Gated in [{gate_bin[0] * self.bin_width} - {gate_bin[1] * self.bin_width}] {unit}",
-            firstybin=gate_bin[0],
-            lastybin=gate_bin[1],
+            name=f"Gated in [{gate_bins[0] * self.bin_width} - {gate_bins[1] * self.bin_width}] {unit}",
+            firstybin=gate_bins[0],
+            lastybin=gate_bins[1],
         )
 
         return pro.Clone()
+
+    def get_2d_background(self, gate_energy: float, gate_width: float) -> TH1:
+        """Calculate the background contribution within the gate region.
+
+        Estimates the background by computing the total projection, subtracting
+        a background estimate via ShowBackground, and normalizing to the gate region.
+
+        Parameters:
+            gate_energy: Center energy for the gate.
+            gate_width: Total width of the gate.
+
+        Returns:
+            The background histogram for the gated region.
+        """
+        n_bins = self.histogram.GetNbinsX()
+        total_projection = self.get_projection(
+            gate_energy=0.5 * n_bins * self.bin_width,  # Central bin
+            gate_width=2 * n_bins * self.bin_width,  # full range
+        )
+        total_background = total_projection.ShowBackground(20)
+
+        total_signal = total_projection.Clone()
+        total_signal.Add(total_background, -1)
+
+        total_yield = total_projection.Integral()
+
+        p_norm = 0
+        b_norm = 0
+
+        gate_bins = self.get_gate_bins(gate_energy=gate_energy, gate_width=gate_width)
+        for j in range(gate_bins[0], gate_bins[1] + 1):
+            p_norm += total_signal.GetBinContent(j)
+            b_norm += total_background.GetBinContent(j)
+
+        pi = total_projection.Clone()
+        bi = total_background.Clone()
+
+        pi.Scale(b_norm / total_yield)
+        bi.Scale(p_norm / total_yield)
+
+        bkg_gate = pi.Clone()
+        bkg_gate.Add(bi, 1)
+
+        return bkg_gate
 
     def draw_projection(
         self,
@@ -223,6 +287,8 @@ class Hist2D:
         unit: str = "keV",
         show_title: bool = False,
         show_stats: bool = True,
+        subtract_background: bool = True,
+        sideband_background_gate_energies: list[float] | None = None,
     ) -> TCanvas:
         """Apply a gate, project the spectrum, and draw it on a canvas.
 
@@ -235,6 +301,8 @@ class Hist2D:
             unit: Energy units (default: keV).
             show_title: Whether to show the histogram title (default: False).
             show_stats: Whether to show statistics box (default: True).
+            subtract_background: Whether to subtract background (default: True).
+            sideband_background_gate_energies: List of gate energies to be used for background subtraction. If none provided, 2d background subtraction method is used by default.
 
         Returns:
             The ROOT TCanvas with the projected histogram.
@@ -243,6 +311,23 @@ class Hist2D:
         projected_histogram = self.get_projection(
             gate_energy=gate_energy, gate_width=gate_width, unit=unit
         )
+
+        if subtract_background:
+            if sideband_background_gate_energies is None:
+                projected_background = self.get_2d_background(
+                    gate_energy=gate_energy, gate_width=gate_width
+                )
+                projected_histogram.Add(projected_background, -1)
+            else:
+                pro_sb = {}
+                for i, sideband_gate_energy in enumerate(
+                    sideband_background_gate_energies
+                ):
+                    pro_sb[i] = self.get_projection(
+                        gate_energy=sideband_gate_energy, gate_width=gate_width
+                    )
+                    pro_sb[i].Scale(1 / len(sideband_background_gate_energies))
+                    projected_histogram.Add(pro_sb[i], -1)
 
         canvas = TCanvas("Gated", "Gated", 1450, 1000)
         projected_histogram.GetYaxis().SetTitle(f"Counts/{self.bin_width} {unit}")
