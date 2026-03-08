@@ -1,7 +1,7 @@
 # GammaSPY: Gamma Spectroscopy analysis in PYthon
 
-> **Warning**
-This package is in active development and may introduce breaking changes.
+> **Warning** This package is in active development and may introduce breaking
+> changes.
 
 A suite of open-source tools for automated γ-ray spectroscopy analysis of fast
 neutron-induced nuclear reactions, developed for data collected with the EXOGAM
@@ -63,8 +63,9 @@ formatting instructions.
 
 ## Installation
 
-Using `pixi` ([installation instructions](https://pixi.prefix.dev/latest/installation/)) is highly recommended since it can also install `root`.
-Then simply:
+Using `pixi`
+([installation instructions](https://pixi.prefix.dev/latest/installation/)) is
+highly recommended since it can also install `root`. Then simply:
 
 ```bash
 git clone https://gitlab.com/Hemantika1122/GammaSPY.git
