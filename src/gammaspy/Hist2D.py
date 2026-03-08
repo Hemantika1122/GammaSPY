@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import ROOT
 from ROOT import TH2D
+from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 logger = logging.getLogger(__name__)
 
@@ -146,15 +151,15 @@ class Hist2D:
         if self.file and self.file.IsOpen():
             self.file.Close()
 
-    def __enter__(self) -> Hist2D:
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 
     def __exit__(
         self,
-        exc_type: type | None,
-        exc_val: BaseException | None,
-        exc_tb: object | None,
+        type_: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """Context manager exit - ensures file is closed."""
         self.close()
