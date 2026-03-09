@@ -91,9 +91,18 @@ canvas = hgg.draw_projection(
 
 First run Talys simulations with relevant target isotope and neutron energy
 range. Pass the output location of the simulation to
-`python save_simulated_counts_1d()` along with incident flux spectrum and other
-experimental parameters. This will save the expected 1D counts at different
-gamma energies as a csv file. Pass this csv file to
-`python save_simulated_projection_spectrum` along with the `LevelScheme` object
-created above and gate energy and widths. It will produce a root file with
-expected spectrum which can be overlaid with experimental spectrum.
+
+```python
+from gammaspy.simulation import (
+    save_simulated_counts_1d,
+    save_simulated_projection_spectrum,
+)
+
+save_simulated_counts_1d()
+```
+
+along with incident flux spectrum and other experimental parameters. This will
+save the expected 1D counts at different gamma energies as a csv file. Pass this
+csv file to `save_simulated_projection_spectrum()` along with the `LevelScheme`
+object created above and gate energy and widths. It will produce a root file
+with expected spectrum which can be overlaid with experimental spectrum.
